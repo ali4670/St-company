@@ -2,12 +2,19 @@ import { useState, useEffect, createContext, useContext } from "react";
 import { supabase } from "../lib/supabase-code";
 import { User, Session } from "@supabase/supabase-js";
 
+export type UserRole = "admin" | "moderator" | "student";
+
 interface Profile {
   id: string;
   username: string;
   score: number;
+  xp: number;
+  role: UserRole;
   is_admin: boolean;
+  is_approved: boolean;
   avatar_url?: string;
+  work_duration: number;
+  break_duration: number;
 }
 
 interface AuthContextType {
@@ -16,6 +23,10 @@ interface AuthContextType {
   profile: Profile | null;
   loading: boolean;
   isAdmin: boolean;
+  isModerator: boolean;
+  isStudent: boolean;
+  isApproved: boolean;
+  role: UserRole;
   refreshProfile: () => Promise<void>;
   signOut: () => Promise<void>;
 }
@@ -36,11 +47,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (error.code === "PGRST116") {
           // Profile doesn't exist, create one
           const { data: userData } = await supabase.auth.getUser();
+          const email = userData.user?.email;
+          const role: UserRole = email === "aliahmedsabry8@gmail.com" ? "admin" : "student";
+          
           const newProfile = {
             id: userId,
-            username: userData.user?.email?.split("@")[0] || "Player",
+            username: email?.split("@")[0] || "Player",
             score: 0,
-            is_admin: userData.user?.email === "aliahmedsabry8@gmail.com",
+            xp: 0,
+            role: role,
+            is_admin: role === "admin",
+            is_approved: role === "admin", // Admins are auto-approved
+            work_duration: 25,
+            break_duration: 5,
           };
 
           const { data: createdProfile, error: createError } = await supabase
@@ -100,11 +119,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await supabase.auth.signOut();
   };
 
-  const isAdmin = profile?.is_admin || user?.email === "aliahmedsabry8@gmail.com";
+  const role: UserRole = profile?.role || (user?.email === "aliahmedsabry8@gmail.com" ? "admin" : "student");
+  const isAdmin = role === "admin";
+  const isModerator = role === "moderator" || role === "admin";
+  const isStudent = role === "student";
+  const isApproved = profile?.is_approved ?? false;
 
   return (
     <AuthContext.Provider
-      value={{ user, session, profile, loading, isAdmin, refreshProfile, signOut }}
+      value={{ 
+        user, 
+        session, 
+        profile, 
+        loading, 
+        isAdmin, 
+        isModerator, 
+        isStudent, 
+        isApproved,
+        role, 
+        refreshProfile, 
+        signOut 
+      }}
     >
       {children}
     </AuthContext.Provider>

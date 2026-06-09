@@ -1,11 +1,13 @@
 import React from "react";
 import { motion } from "framer-motion";
 import { cn } from "../lib/utils";
+import { Loader2 } from "lucide-react";
 
 interface HeroButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: "primary" | "secondary" | "outline" | "ghost";
   size?: "sm" | "md" | "lg" | "xl";
   children: React.ReactNode;
+  loading?: boolean;
 }
 
 export const HeroButton: React.FC<HeroButtonProps> = ({
@@ -13,6 +15,8 @@ export const HeroButton: React.FC<HeroButtonProps> = ({
   size = "md",
   className,
   children,
+  loading = false,
+  disabled,
   ...props
 }) => {
   const variants = {
@@ -32,15 +36,20 @@ export const HeroButton: React.FC<HeroButtonProps> = ({
   return (
     <motion.button
       whileTap={{ scale: 0.95 }}
+      disabled={disabled || loading}
       className={cn(
         "flex items-center justify-center gap-3 font-black uppercase tracking-[0.3em] transition-all disabled:opacity-50 disabled:cursor-not-allowed",
         variants[variant],
         sizes[size],
         className
       )}
-      {...props}
+      {...(props as any)}
     >
-      {children}
+      {loading ? (
+        <Loader2 className="w-4 h-4 animate-spin" />
+      ) : (
+        children
+      )}
     </motion.button>
   );
 };

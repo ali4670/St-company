@@ -11,8 +11,13 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as ProfileRouteImport } from './routes/profile'
+import { Route as ModeratorRouteImport } from './routes/moderator'
+import { Route as LevelsRouteImport } from './routes/levels'
 import { Route as HeroDemoRouteImport } from './routes/hero-demo'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as LectureLectureIdRouteImport } from './routes/lecture.$lectureId'
+import { Route as ExamLevelIdRouteImport } from './routes/exam.$levelId'
+import { Route as LevelsLevelIdClassroomRouteImport } from './routes/levels.$levelId.classroom'
 
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
   id: '/sitemap.xml',
@@ -22,6 +27,16 @@ const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
 const ProfileRoute = ProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ModeratorRoute = ModeratorRouteImport.update({
+  id: '/moderator',
+  path: '/moderator',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LevelsRoute = LevelsRouteImport.update({
+  id: '/levels',
+  path: '/levels',
   getParentRoute: () => rootRouteImport,
 } as any)
 const HeroDemoRoute = HeroDemoRouteImport.update({
@@ -34,39 +49,101 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LectureLectureIdRoute = LectureLectureIdRouteImport.update({
+  id: '/lecture/$lectureId',
+  path: '/lecture/$lectureId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ExamLevelIdRoute = ExamLevelIdRouteImport.update({
+  id: '/exam/$levelId',
+  path: '/exam/$levelId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LevelsLevelIdClassroomRoute = LevelsLevelIdClassroomRouteImport.update({
+  id: '/$levelId/classroom',
+  path: '/$levelId/classroom',
+  getParentRoute: () => LevelsRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/hero-demo': typeof HeroDemoRoute
+  '/levels': typeof LevelsRouteWithChildren
+  '/moderator': typeof ModeratorRoute
   '/profile': typeof ProfileRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/exam/$levelId': typeof ExamLevelIdRoute
+  '/lecture/$lectureId': typeof LectureLectureIdRoute
+  '/levels/$levelId/classroom': typeof LevelsLevelIdClassroomRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/hero-demo': typeof HeroDemoRoute
+  '/levels': typeof LevelsRouteWithChildren
+  '/moderator': typeof ModeratorRoute
   '/profile': typeof ProfileRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/exam/$levelId': typeof ExamLevelIdRoute
+  '/lecture/$lectureId': typeof LectureLectureIdRoute
+  '/levels/$levelId/classroom': typeof LevelsLevelIdClassroomRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/hero-demo': typeof HeroDemoRoute
+  '/levels': typeof LevelsRouteWithChildren
+  '/moderator': typeof ModeratorRoute
   '/profile': typeof ProfileRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/exam/$levelId': typeof ExamLevelIdRoute
+  '/lecture/$lectureId': typeof LectureLectureIdRoute
+  '/levels/$levelId/classroom': typeof LevelsLevelIdClassroomRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/hero-demo' | '/profile' | '/sitemap.xml'
+  fullPaths:
+    | '/'
+    | '/hero-demo'
+    | '/levels'
+    | '/moderator'
+    | '/profile'
+    | '/sitemap.xml'
+    | '/exam/$levelId'
+    | '/lecture/$lectureId'
+    | '/levels/$levelId/classroom'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/hero-demo' | '/profile' | '/sitemap.xml'
-  id: '__root__' | '/' | '/hero-demo' | '/profile' | '/sitemap.xml'
+  to:
+    | '/'
+    | '/hero-demo'
+    | '/levels'
+    | '/moderator'
+    | '/profile'
+    | '/sitemap.xml'
+    | '/exam/$levelId'
+    | '/lecture/$lectureId'
+    | '/levels/$levelId/classroom'
+  id:
+    | '__root__'
+    | '/'
+    | '/hero-demo'
+    | '/levels'
+    | '/moderator'
+    | '/profile'
+    | '/sitemap.xml'
+    | '/exam/$levelId'
+    | '/lecture/$lectureId'
+    | '/levels/$levelId/classroom'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   HeroDemoRoute: typeof HeroDemoRoute
+  LevelsRoute: typeof LevelsRouteWithChildren
+  ModeratorRoute: typeof ModeratorRoute
   ProfileRoute: typeof ProfileRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
+  ExamLevelIdRoute: typeof ExamLevelIdRoute
+  LectureLectureIdRoute: typeof LectureLectureIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -85,6 +162,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProfileRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/moderator': {
+      id: '/moderator'
+      path: '/moderator'
+      fullPath: '/moderator'
+      preLoaderRoute: typeof ModeratorRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/levels': {
+      id: '/levels'
+      path: '/levels'
+      fullPath: '/levels'
+      preLoaderRoute: typeof LevelsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/hero-demo': {
       id: '/hero-demo'
       path: '/hero-demo'
@@ -99,14 +190,50 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/lecture/$lectureId': {
+      id: '/lecture/$lectureId'
+      path: '/lecture/$lectureId'
+      fullPath: '/lecture/$lectureId'
+      preLoaderRoute: typeof LectureLectureIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/exam/$levelId': {
+      id: '/exam/$levelId'
+      path: '/exam/$levelId'
+      fullPath: '/exam/$levelId'
+      preLoaderRoute: typeof ExamLevelIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/levels/$levelId/classroom': {
+      id: '/levels/$levelId/classroom'
+      path: '/$levelId/classroom'
+      fullPath: '/levels/$levelId/classroom'
+      preLoaderRoute: typeof LevelsLevelIdClassroomRouteImport
+      parentRoute: typeof LevelsRoute
+    }
   }
 }
+
+interface LevelsRouteChildren {
+  LevelsLevelIdClassroomRoute: typeof LevelsLevelIdClassroomRoute
+}
+
+const LevelsRouteChildren: LevelsRouteChildren = {
+  LevelsLevelIdClassroomRoute: LevelsLevelIdClassroomRoute,
+}
+
+const LevelsRouteWithChildren =
+  LevelsRoute._addFileChildren(LevelsRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   HeroDemoRoute: HeroDemoRoute,
+  LevelsRoute: LevelsRouteWithChildren,
+  ModeratorRoute: ModeratorRoute,
   ProfileRoute: ProfileRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
+  ExamLevelIdRoute: ExamLevelIdRoute,
+  LectureLectureIdRoute: LectureLectureIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -151,16 +151,22 @@ export const AdvancedTodo: React.FC = () => {
     e.preventDefault();
     if (!user) return toast.error("Login to save tasks");
 
-    const newTodo = {
+    const newTodo: any = {
       user_id: user.id,
       task,
       priority,
       category,
       is_completed: false,
-      time_limit: taskDuration
     };
 
-    const { error } = await supabase.from("todos").insert([newTodo]);
+    let { error } = await supabase.from("todos").insert([{ ...newTodo, time_limit: taskDuration }]);
+    if (error && error.message?.includes("time_limit")) {
+      ({ error } = await supabase.from("todos").insert([newTodo]));
+    }
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
     if (!error) {
       toast.success(isAr ? "تمت إضافة المهمة" : "Mission Initialized");
       setTask("");

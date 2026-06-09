@@ -1,5 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import TicTacToeGame from "../components/TicTacToeGame";
+import { FriendSearch } from "../components/FriendSearch";
+import { Leaderboard } from "../components/Leaderboard";
+import { RainingXO, ScrambledText } from "../components/RainingXO";
 import { ProfileEdit } from "../components/ProfileEdit";
 import { AdvancedTodo } from "../components/todo/AdvancedTodo";
 import { useLanguage } from "../lib/LanguageContext";
@@ -37,13 +40,13 @@ function Index() {
     const channel = supabase
       .channel(`user_challenges_${user.id}`)
       .on(
-        "postgres_changes",
+        "postgres_changes" as any,
         {
           event: "INSERT",
           table: "games",
           filter: `player_o=eq.${user.id}`,
         },
-        async (payload) => {
+        async (payload: any) => {
           const { data: challenger } = await supabase
             .from("profiles")
             .select("username")
@@ -58,13 +61,13 @@ function Index() {
         },
       )
       .on(
-        "postgres_changes",
+        "postgres_changes" as any,
         {
           event: "UPDATE",
           table: "games",
           filter: `player_x=eq.${user.id}`,
         },
-        (payload) => {
+        (payload: any) => {
           if (payload.new.status === "active") {
             setActiveOnlineGame(payload.new.id);
             toast.success(isAr ? "تم قبول التحدي!" : "Challenge accepted!");
@@ -120,27 +123,9 @@ function Index() {
             className="text-4xl md:text-7xl font-black tracking-tighter italic mb-6"
             style={{ fontFamily: '"Arial Black", Impact, sans-serif' }}
           >
-            {(isAr ? "نحن نصنع المستقبل بأيدينا" : "WE BUILD THE FUTURE WITH OUR HANDS").split(" ").map((word, i) => (
-              <motion.span
-                key={i}
-                className="inline-block mr-4 last:mr-0"
-                initial={{ y: 20, opacity: 0 }}
-                whileInView={{ y: 0, opacity: 1 }}
-                transition={{ delay: i * 0.1 }}
-              >
-                {word === "FUTURE" || word === "المستقبل" ? (
-                  <span className="text-[#CCFF00] relative">
-                    {word}
-                    <motion.span 
-                      className="absolute -bottom-2 left-0 w-full h-1 bg-[#CCFF00]"
-                      initial={{ scaleX: 0 }}
-                      whileInView={{ scaleX: 1 }}
-                      transition={{ delay: 0.5, duration: 0.8 }}
-                    />
-                  </span>
-                ) : word}
-              </motion.span>
-            ))}
+            <ScrambledText 
+              phrases={isAr ? ["نحن نصنع المستقبل", "نحن نبني الروبوتات", "نحن نصنع التغيير"] : ["WE BUILD THE FUTURE", "WE BUILD ROBOTS", "WE BUILD CHANGE"]} 
+            />
           </motion.h2>
           <p className="text-white/50 text-xs md:text-sm font-black uppercase tracking-[0.3em]">
             {isAr ? "دورة الروبوتات للأعمار 7-13" : "Robotics Excellence for Ages 7-13"}
@@ -154,12 +139,45 @@ function Index() {
       </section>
 
       {/* Arena Section */}
-      <section id="arena-section" className="py-32 px-6 bg-black/20 backdrop-blur-sm">
-        <div className="container mx-auto max-w-6xl">
-          <TicTacToeGame
-            onlineGameId={activeOnlineGame}
-            onQuit={() => setActiveOnlineGame(null)}
-          />
+      <section id="arena-section" className="py-32 px-6 bg-black/40 backdrop-blur-sm relative overflow-hidden">
+        {/* Raining X and O Background */}
+        <div className="absolute inset-0 opacity-20">
+          <RainingXO />
+        </div>
+
+        {/* Decorative Grid Light */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-[1px] bg-gradient-to-r from-transparent via-cyan-500/20 to-transparent" />
+        
+        <div className="container mx-auto max-w-7xl relative z-10">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-16 items-start">
+            {/* Game Column */}
+            <div className="lg:col-span-7 xl:col-span-8 order-2 lg:order-1">
+              <TicTacToeGame
+                onlineGameId={activeOnlineGame}
+                onQuit={() => setActiveOnlineGame(null)}
+              />
+            </div>
+
+            {/* Social/Stats Column */}
+            <div className="lg:col-span-5 xl:col-span-4 space-y-16 order-1 lg:order-2">
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true }}
+              >
+                <FriendSearch />
+              </motion.div>
+              
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: 0.2 }}
+              >
+                <Leaderboard />
+              </motion.div>
+            </div>
+          </div>
         </div>
       </section>
 

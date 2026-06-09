@@ -22,7 +22,7 @@ import NotFound1 from "../components/ui/8bit-not-found1";
 
 function Header() {
   const { language, setLanguage, isAr } = useLanguage();
-  const { user, profile, signOut, isAdmin } = useAuth();
+  const { user, profile, signOut, isAdmin, isModerator } = useAuth();
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isProfileEditOpen, setIsProfileEditOpen] = useState(false);
 
@@ -34,6 +34,17 @@ function Header() {
         </Link>
 
         <div className="flex items-center gap-4">
+          <Link to="/levels">
+            <HeroButton
+              size="sm"
+              variant="outline"
+              className="px-4 border-cyan-500/20 text-cyan-400 hover:bg-cyan-500/10"
+            >
+              <Globe className="w-3.5 h-3.5 mr-2" />
+              <span className="text-[10px] font-black uppercase tracking-widest">{isAr ? "الدورات" : "COURSES"}</span>
+            </HeroButton>
+          </Link>
+
           <HeroButton
             onClick={() => setLanguage(language === "en" ? "ar" : "en")}
             size="sm"
@@ -55,6 +66,16 @@ function Header() {
                 </span>
               </div>
               <div className="flex items-center gap-2">
+                <Link to="/moderator">
+                  <HeroButton
+                    size="sm"
+                    variant="outline"
+                    className="px-4 border-cyan-500/20 text-cyan-500 hover:bg-cyan-500/20"
+                  >
+                    <Shield className="w-4 h-4 mr-2" />
+                    <span className="hidden md:inline">{isAr ? "لوحة المشرف" : "Moderator Panel"}</span>
+                  </HeroButton>
+                </Link>
                 {isAdmin && (
                   <HeroButton
                     onClick={() => setIsProfileEditOpen(true)}
@@ -69,7 +90,7 @@ function Header() {
                   onClick={() => setIsProfileEditOpen(true)}
                   size="sm"
                   variant="outline"
-                  className="w-10 h-10 p-0 rounded-xl overflow-hidden"
+                  className="w-11 h-11 p-0 rounded-full overflow-hidden border-2 border-cyan-500/30 shadow-[0_0_15px_rgba(6,182,212,0.15)]"
                 >
                   {profile?.avatar_url ? (
                     <img
@@ -78,7 +99,11 @@ function Header() {
                       className="w-full h-full object-cover"
                     />
                   ) : (
-                    <UserIcon className="w-4 h-4" />
+                    <div className="w-full h-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-white font-black text-sm">
+                      {(profile?.username || user.email?.split("@")[0] || "?")
+                        .charAt(0)
+                        .toUpperCase()}
+                    </div>
                   )}
                 </HeroButton>
                 <HeroButton
@@ -207,7 +232,12 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <Outlet />
+      <div className="min-h-screen bg-[#0038FF]">
+        <Header />
+        <main className="pt-24 min-h-screen">
+          <Outlet />
+        </main>
+      </div>
     </QueryClientProvider>
   );
 }

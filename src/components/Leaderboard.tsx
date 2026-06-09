@@ -39,7 +39,7 @@ export const Leaderboard: React.FC = () => {
 
     const channel = supabase
       .channel("leaderboard_changes")
-      .on("postgres_changes", { event: "*", table: "profiles" }, fetchLeaderboard)
+      .on("postgres_changes" as any, { event: "*", table: "profiles" }, fetchLeaderboard)
       .subscribe();
 
     return () => {
@@ -124,7 +124,7 @@ export const Leaderboard: React.FC = () => {
         <ProfileEdit
           isOpen={true}
           onClose={() => setEditingProfile(null)}
-          targetProfile={editingProfile}
+          targetProfile={editingProfile as any}
           onUpdate={fetchLeaderboard}
         />
       )}

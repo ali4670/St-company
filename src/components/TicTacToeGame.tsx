@@ -105,13 +105,13 @@ export default function TicTacToeGame({ onlineGameId, onQuit }: TicTacToeGamePro
     const channel = supabase
       .channel(`game_sync_${onlineGameId}`)
       .on(
-        "postgres_changes",
+        "postgres_changes" as any,
         {
           event: "UPDATE",
           table: "games",
           filter: `id=eq.${onlineGameId}`,
         },
-        (payload) => {
+        (payload: any) => {
           setBoard(payload.new.board as CellValue[]);
           setCurrentPlayer(payload.new.current_turn as "X" | "O");
           setWinner(payload.new.winner as Winner);

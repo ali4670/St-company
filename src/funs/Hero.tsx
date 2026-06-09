@@ -1,9 +1,10 @@
 import React from "react";
 import { motion } from "framer-motion";
-import { Gamepad2, Zap, Globe, Target, Crown, Star, ChevronDown } from "lucide-react";
+import { Gamepad2, Zap, Globe, Target, Crown, Star, ChevronDown, BookOpen } from "lucide-react";
 import { useLanguage } from "../lib/LanguageContext";
 import { HeroButton } from "./HeroButton";
 import { ScrambledText, RainingXO } from "../components/RainingXO";
+import { Link } from "@tanstack/react-router";
 
 export const Hero: React.FC = () => {
   const { isAr } = useLanguage();
@@ -110,6 +111,17 @@ export const Hero: React.FC = () => {
                 <Gamepad2 className="w-5 h-5" />
                 {t.ctaPrimary}
               </HeroButton>
+
+              <Link to="/levels">
+                <HeroButton
+                  size="xl"
+                  variant="outline"
+                  className="w-full"
+                >
+                  <BookOpen className="w-5 h-5" />
+                  {isAr ? "الدورات التعليمية" : "Educational Courses"}
+                </HeroButton>
+              </Link>
 
               <HeroButton
                 size="xl"

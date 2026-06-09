@@ -80,36 +80,67 @@ export const ProfileEdit: React.FC<ProfileEditProps> = ({
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     const targetId = targetProfile?.id || myProfile?.id || user?.id;
-    if (!targetId) return;
+    if (!targetId) {
+      toast.error(isAr ? "فشل تحديد الهوية" : "Identity resolution failed");
+      return;
+    }
 
     setLoading(true);
     try {
-      const updates = {
+      // 1. Prepare base profile data
+      const baseUpdates: any = {
+        id: targetId,
         username,
         avatar_url: avatarUrl,
-        work_duration: workDuration,
-        break_duration: breakDuration,
         updated_at: new Date().toISOString(),
-        ...(isAdmin && targetProfile ? { score } : {}),
       };
+      
+      // Only add these if they have values to avoid schema issues if columns are missing
+      if (workDuration !== undefined) baseUpdates.work_duration = workDuration;
+      if (breakDuration !== undefined) baseUpdates.break_duration = breakDuration;
+      
+      if (isAdmin && targetProfile) {
+        baseUpdates.score = score;
+      }
 
+      console.log("Initiating neural sync:", baseUpdates);
+
+      // 2. Perform Upsert
       const { error: profileError } = await supabase
         .from("profiles")
-        .upsert({ id: targetId, ...updates });
+        .upsert(baseUpdates, { onConflict: 'id' });
 
-      if (profileError) throw profileError;
+      if (profileError) {
+        // Specific check for missing columns
+        if (profileError.message?.includes("column") && profileError.message?.includes("not found")) {
+          throw new Error(isAr 
+            ? "يجب تشغيل كود SQL المحدث في Supabase لإضافة الأعمدة الجديدة" 
+            : "Database schema mismatch. Please run the updated SQL in Supabase Editor.");
+        }
+        throw profileError;
+      }
 
+      // 3. Update Password if requested
       if (newPassword && !targetProfile) {
         const { error: authError } = await supabase.auth.updateUser({ password: newPassword });
         if (authError) throw authError;
       }
 
+      // 4. Finalize
       toast.success(isAr ? "اكتمل مزامنة البيانات" : "Core synchronization complete");
       await refreshProfile();
       if (onUpdate) onUpdate();
-      onClose();
-    } catch (error) {
-      if (error instanceof Error) toast.error(error.message);
+      
+      // Small delay to ensure state propagates before closing
+      setTimeout(() => {
+        onClose();
+      }, 500);
+      
+    } catch (error: any) {
+      console.error("Neural sync failure:", error);
+      // Better error extraction
+      const errorMessage = error?.message || error?.error_description || (typeof error === 'string' ? error : "Connection interrupted");
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }

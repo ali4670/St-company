@@ -63,7 +63,7 @@ const AtmosphericParticles = () => {
   return (
     <points ref={particlesRef}>
       <bufferGeometry>
-        <bufferAttribute attach="position" count={count} array={positions} itemSize={3} />
+        <bufferAttribute attach="attributes-position" args={[positions, 3]} count={count} array={positions} itemSize={3} />
       </bufferGeometry>
       <pointsMaterial size={0.05} color="#06b6d4" transparent opacity={0.4} sizeAttenuation />
     </points>
