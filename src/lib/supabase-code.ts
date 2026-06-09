@@ -165,13 +165,91 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
   END;
   $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+  -- Combined level access check (Whitelist + Sequential)
   CREATE OR REPLACE FUNCTION has_level_access(l_id UUID) 
   RETURNS BOOLEAN AS $$
   BEGIN
+    -- Admin/Moderator always access
+    IF EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND (role IN ('admin', 'moderator') OR is_admin = true)) THEN
+      RETURN TRUE;
+    END IF;
+
+    -- Whitelist check
+    IF EXISTS (SELECT 1 FROM level_access WHERE user_id = auth.uid() AND level_id = l_id) THEN
+      RETURN TRUE;
+    END IF;
+
+    -- Sequential progression check
+    RETURN EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND (is_approved = true OR role IN ('admin', 'moderator'))) 
+           AND can_student_access_level(auth.uid(), l_id);
+  END;
+  $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+  -- Enforce sequential lecture access within a level
+  CREATE OR REPLACE FUNCTION can_access_lecture(p_lecture_id UUID)
+  RETURNS BOOLEAN AS $$
+  DECLARE
+    v_level_id UUID;
+    v_slot_number INTEGER;
+    v_prev_lecture_id UUID;
+  BEGIN
+    -- Admin/Moderator always access
+    IF EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND (role IN ('admin', 'moderator') OR is_admin = true)) THEN
+      RETURN TRUE;
+    END IF;
+
+    -- Get lecture info
+    SELECT level_id, slot_number INTO v_level_id, v_slot_number FROM lectures WHERE id = p_lecture_id;
+    
+    -- Check level access first
+    IF NOT has_level_access(v_level_id) THEN RETURN FALSE; END IF;
+    
+    -- Module 1 always accessible if level is accessible
+    IF v_slot_number = 1 THEN RETURN TRUE; END IF;
+    
+    -- Find the previous lecture in this level
+    SELECT id INTO v_prev_lecture_id FROM lectures 
+    WHERE level_id = v_level_id AND slot_number < v_slot_number 
+    ORDER BY slot_number DESC LIMIT 1;
+    
+    -- Check if previous lecture is completed
     RETURN EXISTS (
-      SELECT 1 FROM level_access 
-      WHERE user_id = auth.uid() AND level_id = l_id
+      SELECT 1 FROM student_progress 
+      WHERE student_id = auth.uid() AND lecture_id = v_prev_lecture_id
     );
+  END;
+  $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+  -- Secure lecture completion
+  CREATE OR REPLACE FUNCTION complete_lecture_secure(p_lecture_id UUID)
+  RETURNS VOID AS $$
+  BEGIN
+    -- Only allow if student can actually access the lecture
+    IF NOT can_access_lecture(p_lecture_id) THEN
+      RAISE EXCEPTION 'Lecture locked or prerequisites not met.';
+    END IF;
+
+    INSERT INTO student_progress (student_id, lecture_id)
+    VALUES (auth.uid(), p_lecture_id)
+    ON CONFLICT (student_id, lecture_id) DO NOTHING;
+  END;
+  $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+  -- Check if student has completed the previous level
+  CREATE OR REPLACE FUNCTION can_student_access_level(u_id UUID, target_level_id UUID)
+  RETURNS BOOLEAN AS $$
+  DECLARE
+    prev_level_id UUID;
+    current_level_order INTEGER;
+    lectures_count INTEGER;
+    completed_count INTEGER;
+  BEGIN
+    SELECT level_order INTO current_level_order FROM levels WHERE id = target_level_id;
+    IF current_level_order = 1 THEN RETURN TRUE; END IF;
+    SELECT id INTO prev_level_id FROM levels WHERE level_order < current_level_order ORDER BY level_order DESC LIMIT 1;
+    SELECT COUNT(*) INTO lectures_count FROM lectures WHERE level_id = prev_level_id;
+    SELECT COUNT(*) INTO completed_count FROM student_progress JOIN lectures ON student_progress.lecture_id = lectures.id WHERE student_progress.student_id = u_id AND lectures.level_id = prev_level_id;
+    RETURN completed_count >= lectures_count;
   END;
   $$ LANGUAGE plpgsql SECURITY DEFINER;
 
@@ -201,7 +279,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
   -- Levels
   DROP POLICY IF EXISTS "View levels" ON levels;
-  CREATE POLICY "View levels" ON levels FOR SELECT USING (is_moderator() OR (is_published = true AND (is_approved() AND has_level_access(id))));
+  CREATE POLICY "View levels" ON levels FOR SELECT USING (is_moderator() OR (is_published = true AND has_level_access(id)));
   DROP POLICY IF EXISTS "Manage levels" ON levels;
   CREATE POLICY "Manage levels" ON levels FOR ALL USING (is_moderator());
 
@@ -213,7 +291,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
   -- Lectures
   DROP POLICY IF EXISTS "View lectures" ON lectures;
-  CREATE POLICY "View lectures" ON lectures FOR SELECT USING (is_moderator() OR (is_approved() AND has_level_access(level_id)));
+  CREATE POLICY "View lectures" ON lectures FOR SELECT USING (can_access_lecture(id));
   DROP POLICY IF EXISTS "Manage lectures" ON lectures;
   CREATE POLICY "Manage lectures" ON lectures FOR ALL USING (is_moderator());
 
