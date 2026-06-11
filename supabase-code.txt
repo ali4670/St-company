@@ -44,9 +44,13 @@ CREATE TABLE IF NOT EXISTS levels (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   title TEXT NOT NULL,
   level_order INTEGER UNIQUE NOT NULL,
+  image_url TEXT,
   is_published BOOLEAN DEFAULT false,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
 );
+
+-- Ensure missing columns exist if table was already created
+ALTER TABLE levels ADD COLUMN IF NOT EXISTS image_url TEXT;
 
 -- Lectures: Individual modules within levels
 CREATE TABLE IF NOT EXISTS lectures (
@@ -58,9 +62,30 @@ CREATE TABLE IF NOT EXISTS lectures (
   video_url TEXT,
   pdf_url TEXT,
   slot_number INTEGER NOT NULL CHECK (slot_number >= 1 AND slot_number <= 12),
+  is_live BOOLEAN DEFAULT true,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()),
   UNIQUE(level_id, slot_number)
 );
+
+-- Ensure missing columns exist
+ALTER TABLE lectures ADD COLUMN IF NOT EXISTS is_live BOOLEAN DEFAULT true;
+
+-- Internal Tasks: Admin to Moderator tasking
+CREATE TABLE IF NOT EXISTS internal_tasks (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  admin_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+  assigned_to_id UUID REFERENCES profiles(id) ON DELETE SET NULL,
+  title TEXT NOT NULL,
+  section TEXT,
+  timeline TEXT,
+  course_time TEXT,
+  description TEXT,
+  is_completed BOOLEAN DEFAULT false,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
+);
+
+ALTER TABLE internal_tasks ALTER COLUMN admin_id DROP NOT NULL;
+ALTER TABLE internal_tasks ADD COLUMN IF NOT EXISTS assigned_to_id UUID REFERENCES profiles(id) ON DELETE SET NULL;
 
 -- Student Progress: Tracks completed lectures
 CREATE TABLE IF NOT EXISTS student_progress (
@@ -268,23 +293,31 @@ DROP POLICY IF EXISTS "Public read profiles" ON profiles;
 CREATE POLICY "Public read profiles" ON profiles FOR SELECT USING (true);
 DROP POLICY IF EXISTS "Users update own profile" ON profiles;
 CREATE POLICY "Users update own profile" ON profiles FOR UPDATE USING (auth.uid() = id);
+DROP POLICY IF EXISTS "Admins delete users" ON profiles;
+CREATE POLICY "Admins delete users" ON profiles FOR DELETE USING (is_admin());
 
--- Levels Policies
-DROP POLICY IF EXISTS "View levels" ON levels;
-CREATE POLICY "View levels" ON levels FOR SELECT USING (is_moderator() OR (is_published = true AND has_level_access(id)));
+-- Internal Tasks Policies
+ALTER TABLE internal_tasks ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Moderators view tasks" ON internal_tasks;
+CREATE POLICY "Moderators view tasks" ON internal_tasks FOR SELECT USING (is_moderator());
+DROP POLICY IF EXISTS "Admins insert tasks" ON internal_tasks;
+CREATE POLICY "Admins insert tasks" ON internal_tasks FOR INSERT WITH CHECK (is_admin());
+DROP POLICY IF EXISTS "Admins update tasks" ON internal_tasks;
+CREATE POLICY "Admins update tasks" ON internal_tasks FOR UPDATE USING (is_admin());
+DROP POLICY IF EXISTS "Admins delete tasks" ON internal_tasks;
+CREATE POLICY "Admins delete tasks" ON internal_tasks FOR DELETE USING (is_admin());
 
--- Lectures Policies
-DROP POLICY IF EXISTS "View lectures" ON lectures;
-CREATE POLICY "View lectures" ON lectures FOR SELECT USING (can_access_lecture(id));
-
--- Progress Policies
-DROP POLICY IF EXISTS "Manage progress" ON student_progress;
-CREATE POLICY "Manage progress" ON student_progress FOR ALL USING (auth.uid() = student_id OR is_moderator());
-
--- Level Access Policies
-DROP POLICY IF EXISTS "View own level_access" ON level_access;
-DROP POLICY IF EXISTS "View own level access" ON level_access;
-CREATE POLICY "View own level_access" ON level_access FOR SELECT USING (auth.uid() = user_id OR is_moderator());
+-- Direct Messages Policies
+DROP POLICY IF EXISTS "View messages" ON direct_messages;
+CREATE POLICY "View messages" ON direct_messages FOR SELECT USING (auth.uid() = sender_id OR auth.uid() = receiver_id OR is_admin());
+DROP POLICY IF EXISTS "Send messages" ON direct_messages;
+CREATE POLICY "Send messages" ON direct_messages FOR INSERT WITH CHECK (auth.uid() = sender_id);
+DROP POLICY IF EXISTS "Delete messages" ON direct_messages;
+CREATE POLICY "Delete messages" ON direct_messages FOR DELETE USING (is_moderator() OR auth.uid() = sender_id);
+DROP POLICY IF EXISTS "Admin delete any message" ON direct_messages;
+CREATE POLICY "Admin delete any message" ON direct_messages FOR DELETE USING (is_admin());
+DROP POLICY IF EXISTS "Update messages" ON direct_messages;
+CREATE POLICY "Update messages" ON direct_messages FOR UPDATE USING (auth.uid() = receiver_id);
 
 -- Level Chats Policies
 DROP POLICY IF EXISTS "View chat" ON level_chats;
@@ -293,26 +326,12 @@ DROP POLICY IF EXISTS "Post chat" ON level_chats;
 CREATE POLICY "Post chat" ON level_chats FOR INSERT WITH CHECK (auth.uid() = sender_id AND has_level_access(level_id));
 DROP POLICY IF EXISTS "Delete chat" ON level_chats;
 CREATE POLICY "Delete chat" ON level_chats FOR DELETE USING (is_moderator());
-
--- Exams Policies
-DROP POLICY IF EXISTS "View exams" ON exams;
-CREATE POLICY "View exams" ON exams FOR SELECT USING (true);
-DROP POLICY IF EXISTS "Manage exams" ON exams;
-CREATE POLICY "Manage exams" ON exams FOR ALL USING (is_moderator());
-
--- Direct Messages Policies
-DROP POLICY IF EXISTS "View messages" ON direct_messages;
-CREATE POLICY "View messages" ON direct_messages FOR SELECT USING (auth.uid() = sender_id OR auth.uid() = receiver_id OR is_admin());
-DROP POLICY IF EXISTS "Send messages" ON direct_messages;
-CREATE POLICY "Send messages" ON direct_messages FOR INSERT WITH CHECK (auth.uid() = sender_id);
-DROP POLICY IF EXISTS "Delete messages" ON direct_messages;
-CREATE POLICY "Delete messages" ON direct_messages FOR DELETE USING (is_moderator());
-DROP POLICY IF EXISTS "Update messages" ON direct_messages;
-CREATE POLICY "Update messages" ON direct_messages FOR UPDATE USING (auth.uid() = receiver_id);
+DROP POLICY IF EXISTS "Admin delete any chat" ON level_chats;
+CREATE POLICY "Admin delete any chat" ON level_chats FOR DELETE USING (is_admin());
 
 -- 5. REALTIME ENABLEMENT
 ----------------------------------------------------------------
 BEGIN;
   DROP PUBLICATION IF EXISTS supabase_realtime;
-  CREATE PUBLICATION supabase_realtime FOR TABLE games, todos, profiles, student_progress, level_chats, direct_messages;
+  CREATE PUBLICATION supabase_realtime FOR TABLE games, todos, profiles, student_progress, level_chats, direct_messages, internal_tasks;
 COMMIT;

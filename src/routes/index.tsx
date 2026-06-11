@@ -139,54 +139,127 @@ function Index() {
       </section>
 
       {/* Arena Section */}
-      <section id="arena-section" className="py-32 px-6 bg-black/40 backdrop-blur-sm relative overflow-hidden">
+      <section id="arena-section" className="py-32 px-6 bg-black relative overflow-hidden">
         {/* Raining X and O Background */}
-        <div className="absolute inset-0 opacity-20">
+        <div className="absolute inset-0 opacity-10">
           <RainingXO />
         </div>
 
-        {/* Decorative Grid Light */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-[1px] bg-gradient-to-r from-transparent via-cyan-500/20 to-transparent" />
-        
         <div className="container mx-auto max-w-7xl relative z-10">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-16 items-start">
-            {/* Game Column */}
-            <div className="lg:col-span-7 xl:col-span-8 order-2 lg:order-1">
-              <TicTacToeGame
-                onlineGameId={activeOnlineGame}
-                onQuit={() => setActiveOnlineGame(null)}
-              />
-            </div>
+          <div className="text-center mb-24">
+            <motion.h2 
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              className="text-5xl md:text-8xl font-black italic tracking-tighter mb-4"
+            >
+              {isAr ? "معرض الأعمال" : "PORTFOLIO"}
+            </motion.h2>
+            <p className="text-cyan-500 font-black uppercase tracking-[0.4em] text-xs">
+              {isAr ? "مشاريع المهندسين المبدعين" : "Showcasing student brilliance"}
+            </p>
+          </div>
 
-            {/* Social/Stats Column */}
-            <div className="lg:col-span-5 xl:col-span-4 space-y-16 order-1 lg:order-2">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {[
+              { title: "Neural Link v1", image: "https://images.unsplash.com/photo-1485827404703-89b55fcc595e?auto=format&fit=crop&q=80&w=800", cat: "Robotics" },
+              { title: "Cyber Frame", image: "https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&q=80&w=800", cat: "Engineering" },
+              { title: "OS Delta", image: "https://images.unsplash.com/photo-1555664424-778a1e5e1b48?auto=format&fit=crop&q=80&w=800", cat: "AI Software" },
+            ].map((item, idx) => (
               <motion.div
-                initial={{ opacity: 0, x: 20 }}
-                whileInView={{ opacity: 1, x: 0 }}
-                viewport={{ once: true }}
+                key={idx}
+                whileHover={{ y: -10 }}
+                className="group relative aspect-[4/5] rounded-[40px] overflow-hidden border border-white/10 bg-white/5"
               >
-                <FriendSearch />
+                <img src={item.image} className="w-full h-full object-cover opacity-50 group-hover:opacity-80 transition-opacity grayscale hover:grayscale-0 duration-700" alt="" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black to-transparent" />
+                <div className="absolute bottom-10 left-10">
+                  <span className="text-[10px] font-black text-[#CCFF00] uppercase tracking-widest">{item.cat}</span>
+                  <h3 className="text-2xl font-black italic uppercase text-white">{item.title}</h3>
+                </div>
               </motion.div>
-              
-              <motion.div
-                initial={{ opacity: 0, x: 20 }}
-                whileInView={{ opacity: 1, x: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: 0.2 }}
-              >
-                <Leaderboard />
-              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Services Section */}
+      <section id="missions-section" className="py-32 px-6 bg-[#050505] relative overflow-hidden">
+        <div className="container mx-auto max-w-7xl relative z-10">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-24 items-center">
+            <div>
+              <h2 className="text-5xl md:text-8xl font-black italic tracking-tighter mb-8 uppercase leading-none">
+                {isAr ? "خدماتنا" : "CORE SERVICES"}
+              </h2>
+              <div className="space-y-6">
+                {[
+                  { t: isAr ? "بناء الروبوتات" : "ROBOTICS CONSTRUCTION", d: isAr ? "تعلم هندسة الميكاترونيكس من الصفر" : "Master mechatronics from the ground up" },
+                  { t: isAr ? "برمجة الأنظمة" : "SYSTEM CODING", d: isAr ? "إتقان لغات البرمجة المتقدمة" : "Advanced software architectural training" },
+                  { t: isAr ? "الذكاء الاصطناعي" : "NEURAL AI", d: isAr ? "تطوير عقول روبوتية ذكية" : "Developing autonomous robotic intelligence" },
+                ].map((s, i) => (
+                  <div key={i} className="group p-8 rounded-[32px] border border-white/5 bg-white/[0.02] hover:bg-[#CCFF00]/10 hover:border-[#CCFF00]/30 transition-all">
+                    <h3 className="text-xl font-black mb-2 group-hover:text-[#CCFF00]">{s.t}</h3>
+                    <p className="text-white/40 font-medium">{s.d}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="relative">
+              <div className="aspect-square rounded-[60px] bg-gradient-to-br from-cyan-500/20 to-blue-600/20 border border-white/10 flex items-center justify-center p-12 overflow-hidden shadow-2xl">
+                <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1531746790731-6c087fec07a8?auto=format&fit=crop&q=80&w=800')] opacity-30 grayscale mix-blend-overlay" />
+                <motion.div 
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+                  className="w-full h-full border-[1px] border-dashed border-[#CCFF00]/30 rounded-full flex items-center justify-center"
+                >
+                  <div className="w-2/3 h-2/3 border-[1px] border-[#CCFF00]/50 rounded-full shadow-[0_0_100px_rgba(204,255,0,0.2)]" />
+                </motion.div>
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Missions Section */}
-      <section id="missions-section" className="py-32 px-6 bg-white/[0.05] backdrop-blur-sm">
+      {/* Missions Tracker Section */}
+      <section className="py-32 px-6 bg-white/[0.03] backdrop-blur-sm border-t border-white/5">
         <div className="container mx-auto max-w-6xl">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl md:text-6xl font-black italic uppercase tracking-tighter mb-4">{isAr ? "متتبع المهمات" : "MISSION CONTROL"}</h2>
+            <p className="text-white/30 text-[10px] font-black uppercase tracking-[0.5em]">{isAr ? "تحكم في أهدافك اليومية" : "Command your daily objectives"}</p>
+          </div>
           <AdvancedTodo />
         </div>
       </section>
+
+      {/* Premium Footer */}
+      <footer className="bg-black py-24 px-6 border-t border-white/5 relative overflow-hidden">
+        <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-[#CCFF00]/30 to-transparent" />
+        <div className="container mx-auto max-w-7xl relative z-10">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-12">
+            <div className="text-center md:text-left">
+              <h3 className="text-3xl font-black italic tracking-tighter text-white mb-2">ST-COMPANY<span className="text-cyan-500">.</span></h3>
+              <p className="text-white/30 text-[10px] font-black uppercase tracking-[0.4em] mb-8">{isAr ? "نحن نبني المستقبل" : "ENGINEERING THE UNKNOWN"}</p>
+              <div className="flex gap-4">
+                {["IG", "TW", "LI", "FB"].map(s => (
+                  <button key={s} className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-[10px] font-black hover:bg-[#CCFF00] hover:text-black transition-all">
+                    {s}
+                  </button>
+                ))}
+              </div>
+            </div>
+            
+            <div className="bg-white/5 backdrop-blur-xl border border-white/10 p-10 rounded-[40px] text-center max-w-sm">
+              <span className="text-[10px] font-black text-cyan-500 uppercase tracking-widest mb-2 block">{isAr ? "المصمم الرئيسي" : "CHIEF DESIGNER"}</span>
+              <h4 className="text-3xl font-black italic text-white tracking-tighter uppercase mb-4">ALI-AHMED</h4>
+              <p className="text-white/40 text-xs font-medium italic">"Designing digital realms where imagination meets heavy engineering."</p>
+            </div>
+            
+            <div className="text-center md:text-right">
+              <p className="text-white/40 text-[10px] font-black uppercase tracking-widest mb-2">© 2026 ST-COMPANY CORP.</p>
+              <p className="text-white/20 text-[8px] font-bold uppercase tracking-widest">ALL RIGHTS RESERVED // UNIT-ST-OS</p>
+            </div>
+          </div>
+        </div>
+      </footer>
 
       {/* Challenge Modal */}
       <AnimatePresence>

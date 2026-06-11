@@ -24,7 +24,8 @@ export const Leaderboard: React.FC = () => {
   const fetchLeaderboard = async () => {
     const { data, error } = await supabase
       .from("profiles")
-      .select("id, username, score, avatar_url")
+      .select("id, username, score, avatar_url, role")
+      .eq("role", "student") // Only students in leaderboard
       .order("score", { ascending: false })
       .limit(10);
 

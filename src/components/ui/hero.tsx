@@ -204,7 +204,7 @@ export const Component = () => {
           {/* Absolute Overlays (Cards, Arrows, Badge) */}
           <div className="absolute inset-0 w-full h-full pointer-events-none">
             
-            {/* Spline Robot (Replacing Card 1) */}
+            {/* Original Compact Spline Robot */}
             <div className="absolute -bottom-[15%] -left-[10%] md:left-[5%] w-[300px] h-[300px] md:w-[600px] md:h-[600px] z-30 pointer-events-auto">
               {isClient && (
                 <Suspense fallback={<div className="w-full h-full flex items-center justify-center"><div className="w-12 h-12 border-4 border-[#CCFF00] border-t-transparent rounded-full animate-spin" /></div>}>

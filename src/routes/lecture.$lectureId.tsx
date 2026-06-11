@@ -12,17 +12,34 @@ import {
   ArrowRight,
   Zap,
   Lock,
+  Settings,
 } from "lucide-react";
 import { HeroButton } from "../funs/HeroButton";
 import { toast } from "sonner";
+import mammoth from "mammoth";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../components/ui/dropdown-menu";
 
 export const Route = createFileRoute("/lecture/$lectureId")({
   component: LecturePage,
 });
 
 interface ContentBlock {
-  type: "text" | "code" | "image";
+  type: "text" | "code" | "image" | "pdf" | "download" | "word" | "canvas" | "quiz";
   content: string;
+  metadata?: {
+    filename?: string;
+    filesize?: string;
+    quiz?: {
+      question: string;
+      options: string[];
+      correctOptionIndex: number;
+    };
+  };
 }
 
 interface Lecture {
@@ -33,6 +50,89 @@ interface Lecture {
   level_id: string;
   slot_number: number;
   content_blocks?: ContentBlock[];
+}
+
+function WordDocumentViewer({ url }: { url: string }) {
+  const [html, setHtml] = useState<string>("");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch(url)
+      .then(res => res.arrayBuffer())
+      .then(arrayBuffer => mammoth.convertToHtml({ arrayBuffer }))
+      .then(result => {
+        setHtml(result.value);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error(err);
+        setLoading(false);
+      });
+  }, [url]);
+
+  if (loading) return <div className="text-white/50">Loading document...</div>;
+  return <div dangerouslySetInnerHTML={{ __html: html }} className="prose prose-invert max-w-none" />;
+}
+
+function ContentRenderer({ block, onQuizAnswer, quizAnswers, quizStatus, isAr }: { block: ContentBlock, onQuizAnswer: (id: string, idx: number, correct: number) => void, quizAnswers: Record<string, number>, quizStatus: Record<string, 'correct' | 'incorrect'>, isAr: boolean }) {
+  if (!block || !block.type) return null;
+
+  try {
+    switch (block.type) {
+      case "text":
+        return <p className="text-lg text-white/70 leading-relaxed whitespace-pre-wrap">{block.content}</p>;
+      case "code":
+        return (
+          <div className="relative group">
+            <pre className="bg-black/60 p-8 rounded-3xl overflow-x-auto text-sm font-mono text-cyan-400 border border-white/5">
+              <code>{block.content}</code>
+            </pre>
+            <div className="absolute top-4 right-4 text-[8px] font-black text-white/10 uppercase tracking-widest">ST-OS COMPILED</div>
+          </div>
+        );
+      case "image":
+        return <img src={block.content} className="w-full rounded-3xl border border-white/10 shadow-2xl" alt="" />;
+      case "pdf":
+        return <iframe src={block.content} className="w-full h-[600px] rounded-3xl" title="PDF" />;
+      case "download":
+        return (
+          <a href={block.content} className="flex items-center gap-4 p-6 bg-cyan-500/10 rounded-2xl border border-cyan-500/20 text-cyan-500 hover:bg-cyan-500/20" download>
+            <FileDown className="w-8 h-8" />
+            <div>
+              <p className="font-black uppercase">{block.metadata?.filename || "Download File"}</p>
+              <p className="text-xs text-cyan-500/60">{block.metadata?.filesize || ""}</p>
+            </div>
+          </a>
+        );
+      case "canvas":
+        return <iframe src={block.content} className="w-full h-[500px] rounded-3xl" title="Interactive" />;
+      case "word":
+        return <WordDocumentViewer url={block.content} />;
+      case "quiz":
+        if (!block.metadata?.quiz) return null;
+        return (
+          <div className="p-6 bg-cyan-500/10 border border-cyan-500/20 rounded-2xl">
+            <p className="font-bold mb-4">{block.metadata.quiz.question}</p>
+            <div className="space-y-2">
+              {block.metadata.quiz.options.map((opt, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => onQuizAnswer(block.id, idx, block.metadata!.quiz!.correctOptionIndex)}
+                  className={`w-full text-left p-3 rounded-lg border ${quizAnswers[block.id] === idx ? (quizStatus[block.id] === 'correct' ? 'bg-green-500/20 border-green-500' : 'bg-red-500/20 border-red-500') : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
+                >
+                  {opt}
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+      default:
+        return <div className="text-white/20 p-4 border border-dashed border-white/10 rounded-xl">Unsupported block type: {block.type}</div>;
+    }
+  } catch (e) {
+    console.error("Error rendering block:", e);
+    return <div className="text-red-500 p-4">Error rendering content</div>;
+  }
 }
 
 function LecturePage() {
@@ -52,9 +152,112 @@ function LecturePage() {
   // Video player restrictions
   const [maxTimeWatched, setMaxTimeWatched] = useState(0);
   const [isVideoFinished, setIsVideoFinished] = useState(false);
+  const [selectedQuality, setSelectedQuality] = useState("auto");
   const videoRef = useRef<HTMLVideoElement>(null);
+  const youtubePlayerRef = useRef<any>(null);
 
   const contentScrollRef = useRef<HTMLDivElement>(null);
+
+  const handleVideoEnded = useCallback(() => {
+    setIsVideoFinished(true);
+    toast.success(
+      isAr
+        ? "اكتمل الفيديو! يمكنك الآن إكمال المهمة"
+        : "Video completed! You can now execute the mission",
+    );
+  }, [isAr]);
+
+  const handleQualityChange = (quality: string) => {
+    setSelectedQuality(quality);
+    if (youtubePlayerRef.current) {
+      youtubePlayerRef.current.setPlaybackQuality(quality);
+      toast.info(isAr ? `تم تغيير الجودة إلى ${quality}` : `Quality changed to ${quality}`);
+    } else {
+      toast.info(isAr ? "الجودة تلقائية حسب سرعة الإنترنت" : "Quality is automatic based on connection");
+    }
+  };
+
+  // Load YouTube API
+  useEffect(() => {
+    if (lecture?.video_url && (lecture.video_url.includes("youtube.com") || lecture.video_url.includes("youtu.be"))) {
+      // @ts-ignore
+      if (!window.YT) {
+        const tag = document.createElement("script");
+        tag.src = "https://www.youtube.com/iframe_api";
+        const firstScriptTag = document.getElementsByTagName("script")[0];
+        firstScriptTag.parentNode?.insertBefore(tag, firstScriptTag);
+
+        // @ts-ignore
+        window.onYouTubeIframeAPIReady = () => {
+          console.log("YouTube API Ready");
+        };
+      }
+    }
+  }, [lecture?.video_url]);
+
+  const onPlayerStateChange = useCallback((event: any) => {
+    // @ts-ignore
+    if (event.data === window.YT.PlayerState.ENDED) {
+      handleVideoEnded();
+    }
+  }, [handleVideoEnded]);
+
+  // Prevent seeking forward for YouTube
+  useEffect(() => {
+    let interval: any;
+    if (youtubePlayerRef.current && !isAdmin && !isModerator) {
+      interval = setInterval(() => {
+        const player = youtubePlayerRef.current;
+        if (player && player.getCurrentTime) {
+          const currentTime = player.getCurrentTime();
+          if (currentTime > maxTimeWatched + 2) { // Allow 2 seconds buffer
+            player.seekTo(maxTimeWatched, true);
+            toast.info(isAr ? "لا يمكنك التخطي للأمام في الفيديو" : "You cannot skip forward in the video");
+          } else if (currentTime > maxTimeWatched) {
+            setMaxTimeWatched(currentTime);
+          }
+        }
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [maxTimeWatched, isAdmin, isModerator, isAr]);
+
+  useEffect(() => {
+    let player: any;
+    if (lecture?.video_url && (lecture.video_url.includes("youtube.com") || lecture.video_url.includes("youtu.be"))) {
+      const videoId = lecture.video_url.includes("watch?v=") 
+        ? lecture.video_url.split("watch?v=")[1].split("&")[0]
+        : lecture.video_url.includes("youtu.be/")
+        ? lecture.video_url.split("youtu.be/")[1].split("?")[0]
+        : null;
+
+      if (videoId) {
+        const checkYT = setInterval(() => {
+          // @ts-ignore
+          if (window.YT && window.YT.Player) {
+            clearInterval(checkYT);
+            player = new (window.YT as any).Player(`youtube-player-${lectureId}`, {
+              height: '100%',
+              width: '100%',
+              videoId: videoId,
+              events: {
+                'onStateChange': onPlayerStateChange
+              },
+              playerVars: {
+                'rel': 0,
+                'modestbranding': 1,
+              }
+            });
+            youtubePlayerRef.current = player;
+          }
+        }, 500);
+        return () => {
+          clearInterval(checkYT);
+          if (player && player.destroy) player.destroy();
+        };
+      }
+    }
+  }, [lecture?.video_url, lectureId, onPlayerStateChange]);
 
   const fetchLecture = useCallback(async () => {
     setLoading(true);
@@ -66,7 +269,14 @@ function LecturePage() {
         .single();
 
       if (error) throw error;
-      setLecture(data);
+      if (data) {
+        if (data.is_live === false && !isAdmin && !isModerator) {
+           toast.error(isAr ? "هذه المحاضرة غير متاحة حالياً" : "This unit is currently under maintenance.");
+           navigate({ to: "/levels" });
+           return;
+        }
+        setLecture(data);
+      }
 
       if (user) {
         // فحص حالة الإتمام، الصلاحيات الخاصة، واستدعاء دالة التتابع عبر الـ RPC من قاعدة البيانات
@@ -115,20 +325,21 @@ function LecturePage() {
         if (allLecturesInLevel) {
           const currentLectureIndex = allLecturesInLevel.findIndex((l) => l.id === lectureId);
 
-          if (currentLectureIndex > 0 && !isAdmin && !isModerator) {
-            const previousLecture = allLecturesInLevel[currentLectureIndex - 1];
-            const { data: previousLectureProgress } = await supabase
+          if (currentLectureIndex > 0) {
+            const previousLectures = allLecturesInLevel.slice(0, currentLectureIndex);
+            
+            const { data: completedLectures, error: progressError } = await supabase
               .from("student_progress")
               .select("lecture_id")
               .eq("student_id", user.id)
-              .eq("lecture_id", previousLecture.id);
+              .in("lecture_id", previousLectures.map(l => l.id));
 
-            if (!previousLectureProgress || previousLectureProgress.length === 0) {
+            if (progressError || !completedLectures || completedLectures.length < previousLectures.length) {
               setIsLockedBySequence(true);
               toast.error(
                 isAr
-                  ? "أكمل المحاضرة السابقة في هذا المستوى أولاً"
-                  : "Please complete the previous lecture first.",
+                  ? "أكمل جميع المحاضرات السابقة في هذا المستوى أولاً"
+                  : "Please complete all previous lectures in this level first.",
               );
               navigate({ to: "/levels" });
               return;
@@ -227,13 +438,20 @@ function LecturePage() {
     }
   };
 
-  const handleVideoEnded = () => {
-    setIsVideoFinished(true);
-    toast.success(
-      isAr
-        ? "اكتمل الفيديو! يمكنك الآن إكمال المهمة"
-        : "Video completed! You can now execute the mission",
-    );
+  const [quizAnswers, setQuizAnswers] = useState<Record<string, number>>({});
+  const [quizStatus, setQuizStatus] = useState<Record<string, 'correct' | 'incorrect'>>({});
+
+  const isAllQuizzesPassed = lecture?.content_blocks?.filter(b => b.type === 'quiz').every(b => quizStatus[b.id] === 'correct') ?? true;
+
+  const handleQuizAnswer = (blockId: string, optionIndex: number, correctIndex: number) => {
+    setQuizAnswers(prev => ({ ...prev, [blockId]: optionIndex }));
+    if (optionIndex === correctIndex) {
+      setQuizStatus(prev => ({ ...prev, [blockId]: 'correct' }));
+      toast.success(isAr ? "إجابة صحيحة!" : "Correct answer!");
+    } else {
+      setQuizStatus(prev => ({ ...prev, [blockId]: 'incorrect' }));
+      toast.error(isAr ? "إجابة خاطئة، حاول مرة أخرى" : "Incorrect, try again");
+    }
   };
 
   const handleComplete = async () => {
@@ -244,9 +462,9 @@ function LecturePage() {
       !hasScrolledToEnd ||
       (!isVideoFinished &&
         lecture?.video_url &&
-        lecture.video_url.match(/\.(mp4|webm|ogg)$/i) &&
         !isAdmin &&
-        !isModerator)
+        !isModerator) ||
+      !isAllQuizzesPassed
     ) {
       if (!hasScrolledToEnd) {
         toast.error(
@@ -254,10 +472,11 @@ function LecturePage() {
             ? "يرجى قراءة شرح المهمة بالكامل (قم بالتمرير للأسفل)"
             : "Please read the full mission briefing (scroll to bottom)",
         );
+      } else if (!isAllQuizzesPassed) {
+        toast.error(isAr ? "الرجاء حل الاختبار بشكل صحيح" : "Please pass the quiz first");
       } else if (
         !isVideoFinished &&
         lecture?.video_url &&
-        lecture.video_url.match(/\.(mp4|webm|ogg)$/i) &&
         !isAdmin &&
         !isModerator
       ) {
@@ -366,8 +585,35 @@ function LecturePage() {
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="aspect-video w-full rounded-[40px] overflow-hidden bg-black/40 border border-white/10 shadow-2xl relative"
+              className="aspect-video w-full rounded-[40px] overflow-hidden bg-black/40 border border-white/10 shadow-2xl relative group/video"
             >
+              <div className="absolute top-6 right-6 z-20 opacity-0 group-hover/video:opacity-100 transition-opacity">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className="w-10 h-10 rounded-full bg-black/60 backdrop-blur-md border border-white/10 flex items-center justify-center hover:bg-white/10 transition-colors">
+                      <Settings className="w-5 h-5 text-white" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="bg-black/90 border-white/10 text-white min-w-[120px] rounded-2xl backdrop-blur-xl">
+                    <DropdownMenuItem onClick={() => handleQualityChange("auto")} className="hover:bg-white/10 rounded-xl cursor-pointer">
+                      Auto
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleQualityChange("hd1080")} className="hover:bg-white/10 rounded-xl cursor-pointer">
+                      1080p (HD)
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleQualityChange("hd720")} className="hover:bg-white/10 rounded-xl cursor-pointer">
+                      720p (HD)
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleQualityChange("large")} className="hover:bg-white/10 rounded-xl cursor-pointer">
+                      480p
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleQualityChange("medium")} className="hover:bg-white/10 rounded-xl cursor-pointer">
+                      360p
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+
               {lecture.video_url ? (
                 lecture.video_url.match(/\.(mp4|webm|ogg)$/i) ? (
                   <video
@@ -381,6 +627,8 @@ function LecturePage() {
                     onContextMenu={(e) => e.preventDefault()}
                     controlsList="nodownload"
                   />
+                ) : (lecture.video_url.includes("youtube.com") || lecture.video_url.includes("youtu.be")) ? (
+                  <div id={`youtube-player-${lectureId}`} className="w-full h-full" />
                 ) : (
                   <iframe
                     src={getEmbedUrl(lecture.video_url)}
@@ -401,34 +649,19 @@ function LecturePage() {
             <div className="space-y-8">
               {lecture.content_blocks?.map((block, i) => (
                 <motion.div
-                  key={i}
+                  key={block.id || i}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.1 }}
                   className="p-10 rounded-[40px] bg-white/5 border border-white/10 backdrop-blur-xl"
                 >
-                  {block.type === "text" && (
-                    <p className="text-lg text-white/70 leading-relaxed whitespace-pre-wrap">
-                      {block.content}
-                    </p>
-                  )}
-                  {block.type === "code" && (
-                    <div className="relative group">
-                      <pre className="bg-black/60 p-8 rounded-3xl overflow-x-auto text-sm font-mono text-cyan-400 border border-white/5">
-                        <code>{block.content}</code>
-                      </pre>
-                      <div className="absolute top-4 right-4 text-[8px] font-black text-white/10 uppercase tracking-widest">
-                        ST-OS COMPILED
-                      </div>
-                    </div>
-                  )}
-                  {block.type === "image" && (
-                    <img
-                      src={block.content}
-                      className="w-full rounded-3xl border border-white/10 shadow-2xl"
-                      alt=""
-                    />
-                  )}
+                  <ContentRenderer 
+                    block={block} 
+                    onQuizAnswer={handleQuizAnswer} 
+                    quizAnswers={quizAnswers} 
+                    quizStatus={quizStatus}
+                    isAr={isAr}
+                  />
                 </motion.div>
               ))}
 
@@ -505,10 +738,10 @@ function LecturePage() {
                     !hasScrolledToEnd ||
                     isSubmitting ||
                     (lecture.video_url &&
-                      lecture.video_url.match(/\.(mp4|webm|ogg)$/i) &&
                       !isVideoFinished &&
                       !isAdmin &&
-                      !isModerator)
+                      !isModerator) ||
+                    !isAllQuizzesPassed
                   }
                 >
                   {isAr ? "إكمال المهمة" : "EXECUTE MISSION"}

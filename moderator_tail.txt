@@ -1,0 +1,250 @@
+                  <Check className="w-5 h-5" />
+                </button>
+                <div>
+                  <div className="flex items-center gap-3 mb-1">
+                    <h3 className="font-bold text-lg leading-none">{task.title}</h3>
+                    <span className="text-[8px] font-black uppercase px-2 py-0.5 bg-cyan-500/10 text-cyan-400 rounded border border-cyan-500/20">{task.section}</span>
+                    {task.profiles && (
+                      <span className="text-[8px] font-black uppercase px-2 py-0.5 bg-white/5 text-white/60 rounded border border-white/10">
+                        Assigned to: {task.profiles.username}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-4 text-[9px] font-black text-white/30 uppercase tracking-widest">
+                    <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {task.timeline}</span>
+                    <span className="flex items-center gap-1"><Monitor className="w-3 h-3" /> {task.course_time}</span>
+                  </div>
+                </div>
+              </div>
+  const [selectedTask, setSelectedTask] = useState<InternalTask | null>(null);
+
+  // ... (inside InternalTasks) ...
+  return (
+    <div className="space-y-8">
+      {/* ... (Header and Add Task form) ... */}
+
+      {/* Task List */}
+      <div className="grid gap-4">
+        {/* ... (tasks.map loop) ... */}
+              <div className="flex items-center gap-4">
+                {isAdmin && (
+                  <button onClick={() => deleteTask(task.id)} className="p-3 rounded-xl bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition-all">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
+                <div className="w-1px h-8 bg-white/5" />
+                <button 
+                  onClick={() => setSelectedTask(task)}
+                  className="text-[10px] font-black uppercase tracking-widest text-cyan-500 hover:text-cyan-400"
+                >
+                  {isAr ? "عرض التفاصيل" : "View Details"}
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Task Details Modal */}
+      {selectedTask && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm">
+          <motion.div 
+            initial={{ scale: 0.9, opacity: 0 }} 
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-[#111] border border-white/10 p-8 rounded-[40px] max-w-lg w-full shadow-2xl"
+          >
+            <h3 className="text-2xl font-black italic uppercase mb-2">{selectedTask.title}</h3>
+            <p className="text-white/40 text-sm mb-6">{selectedTask.description}</p>
+            <div className="grid grid-cols-2 gap-4 mb-8">
+               <div className="p-4 bg-black/40 rounded-2xl border border-white/5">
+                 <p className="text-[8px] font-black uppercase text-white/30">Timeline</p>
+                 <p className="text-sm font-bold">{selectedTask.timeline}</p>
+               </div>
+               <div className="p-4 bg-black/40 rounded-2xl border border-white/5">
+                 <p className="text-[8px] font-black uppercase text-white/30">Effort</p>
+                 <p className="text-sm font-bold">{selectedTask.course_time}</p>
+               </div>
+            </div>
+            <HeroButton onClick={() => setSelectedTask(null)} className="w-full">
+              {isAr ? "إغلاق" : "CLOSE"}
+            </HeroButton>
+          </motion.div>
+        </div>
+      )}
+    </div>
+  );
+
+function CourseProgress({ isAr }: { isAr: boolean }) {
+  const [processedUsers, setProcessedUsers] = useState<ProgressUser[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchCourseData();
+  }, []);
+
+  const fetchCourseData = async () => {
+    setLoading(true);
+    try {
+      const [profilesRes, levelsRes, lecturesRes, studentProgressRes, levelAccessRes] =
+        await Promise.all([
+          supabase.from("profiles").select("*"),
+          supabase.from("levels").select("*"),
+          supabase.from("lectures").select("id, level_id, slot_number"),
+          supabase.from("student_progress").select("student_id, lecture_id"),
+          supabase.from("level_access").select("user_id, level_id"),
+        ]);
+
+      const allProfiles: Profile[] = (profilesRes.data || []).filter(p => p.role === 'student');
+      const allLevels: Level[] = levelsRes.data || [];
+      const allLectures: FullLecture[] = lecturesRes.data || [];
+      const allStudentProgress: { student_id: string; lecture_id: string }[] =
+        studentProgressRes.data || [];
+      const allLevelAccess: { user_id: string; level_id: string }[] = levelAccessRes.data || [];
+
+      // Map lectures to their levels
+      const levelsWithLectures = allLevels.map((level) => ({
+        ...level,
+        lectures: allLectures
+          .filter((lec) => lec.level_id === level.id)
+          .sort((a, b) => a.slot_number - b.slot_number),
+      }));
+
+      const usersWithProgress: ProgressUser[] = allProfiles
+        .map((profile) => {
+          let totalLecturesForUser = 0;
+          let completedLecturesForUser = 0;
+
+          // Determine which levels this user has access to
+          const accessibleLevelIds = allLevelAccess
+            .filter((la) => la.user_id === profile.id)
+            .map((la) => la.level_id);
+
+          // For admins/moderators, they have access to all levels
+          const userAccessibleLevels =
+            profile.role === "admin" || profile.role === "moderator"
+              ? levelsWithLectures
+              : levelsWithLectures.filter((level) => accessibleLevelIds.includes(level.id));
+
+          userAccessibleLevels.forEach((level) => {
+            totalLecturesForUser += level.lectures.length;
+            level.lectures.forEach((lecture) => {
+              if (
+                allStudentProgress.some(
+                  (sp) => sp.student_id === profile.id && sp.lecture_id === lecture.id,
+                )
+              ) {
+                completedLecturesForUser++;
+              }
+            });
+          });
+
+          const completionPercentage =
+            totalLecturesForUser > 0 ? (completedLecturesForUser / totalLecturesForUser) * 100 : 0;
+
+          return {
+            ...profile,
+            totalLectures: totalLecturesForUser,
+            completedLectures: completedLecturesForUser,
+            completionPercentage: parseFloat(completionPercentage.toFixed(2)),
+          };
+        })
+        .sort((a, b) => b.completedLectures - a.completedLectures); // Sort by completed lectures for leaderboard
+
+      setProcessedUsers(usersWithProgress);
+    } catch (error) {
+      console.error("Error fetching course data:", error);
+      toast.error(isAr ? "فشل تحميل بيانات الدورة" : "Failed to load course data");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const top3 = processedUsers.slice(0, 3);
+
+  return (
+    <div className="space-y-8">
+      {loading ? (
+        <div className="flex items-center justify-center py-10">
+          <div className="w-12 h-12 border-4 border-[#CCFF00] border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : (
+        <>
+          {/* Top 3 Leaderboard */}
+          <div className="bg-black/40 backdrop-blur-xl border border-white/10 rounded-[48px] p-8 space-y-6">
+            <h2 className="text-xl font-black italic uppercase text-white/80">
+              {isAr ? "أفضل 3 عملاء" : "TOP 3 AGENTS"}
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {top3.map((user, index) => (
+                <div
+                  key={user.id}
+                  className="relative p-6 rounded-[32px] bg-white/5 border border-white/10 flex items-center gap-4"
+                >
+                  <div className="absolute -top-4 -right-4 w-12 h-12 rounded-full bg-[#CCFF00] text-black flex items-center justify-center font-black text-xl shadow-lg shadow-[#CCFF00]/20">
+                    {index + 1}
+                  </div>
+                  <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-[#CCFF00]/50 flex-shrink-0">
+                    {user.avatar_url ? (
+                      <img src={user.avatar_url} className="w-full h-full object-cover" />
+                    ) : (
+                      <Users className="w-8 h-8 text-white/20 m-auto" />
+                    )}
+                  </div>
+                  <div>
+                    <p className="font-bold text-lg">{user.username}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <Trophy className="w-4 h-4 text-[#CCFF00]" />
+                      <span className="text-[10px] font-black uppercase text-white/70">
+                        {user.completedLectures} {isAr ? "مهمة مكتملة" : "MISSIONS COMPLETED"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* All Users Progress */}
+          <div className="bg-black/40 backdrop-blur-xl border border-white/10 rounded-[48px] p-8 space-y-6">
+            <h2 className="text-xl font-black italic uppercase text-white/80">
+              {isAr ? "تقرير تقدم العميل" : "AGENT PROGRESS REPORT"}
+            </h2>
+            <div className="space-y-4">
+              {processedUsers.map((user) => (
+                <div
+                  key={user.id}
+                  className="flex items-center gap-4 p-4 rounded-2xl bg-white/5 border border-white/10"
+                >
+                  <div className="w-12 h-12 rounded-full overflow-hidden border border-white/10 flex-shrink-0">
+                    {user.avatar_url ? (
+                      <img src={user.avatar_url} className="w-full h-full object-cover" />
+                    ) : (
+                      <Users className="w-6 h-6 text-white/20 m-auto" />
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-bold text-base">{user.username}</p>
+                    <div className="flex items-center gap-2 text-[10px] font-black uppercase text-white/40">
+                      <span>
+                        {user.completedLectures} / {user.totalLectures} {isAr ? "مهمة" : "MISSIONS"}
+                      </span>
+                      <span className="text-[#CCFF00]">{user.completionPercentage}%</span>
+                    </div>
+                  </div>
+                  <div className="w-32 h-1.5 bg-white/10 rounded-full">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${user.completionPercentage}%` }}
+                      transition={{ duration: 1, ease: "easeOut" }}
+                      className="h-full bg-[#CCFF00] rounded-full"
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
